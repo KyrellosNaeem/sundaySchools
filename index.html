@@ -299,7 +299,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getFirestore(app);
+const db = getFirestore(app);
 
 // ============================================================
 // 2. LOCAL DB (IndexedDB) — this is what makes scanning work
