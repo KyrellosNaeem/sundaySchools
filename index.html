@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Roll Call</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#12362E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#16211C;
+    --paper:#EEF3EE;
+    --paper-2:#E1EAE1;
+    --line:#C6D3C6;
+    --teal:#12362E;
+    --teal-dim:#1E4A3D;
+    --amber:#E2963A;
+    --amber-dim:#C57D28;
+    --red:#B4483A;
+    --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Libre Franklin',system-ui,sans-serif;
+    min-height:100vh;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  header{
+    background:var(--teal);
+    color:var(--paper);
+    padding:20px 20px 18px;
+    position:sticky; top:0; z-index:5;
+  }
+  header h1{
+    margin:0;
+    font-size:1.4rem;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  header .sub{
+    margin-top:4px;
+    font-size:0.85rem;
+    color:#A9C4B8;
+  }
+  .status-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:12px;
+    font-size:0.8rem;
+  }
+  .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--red);
+    flex-shrink:0;
+  }
+  .dot.on{background:#6FBF8B;}
+
+  main{
+    padding:16px;
+    max-width:480px;
+    margin:0 auto;
+  }
+
+  .session-box{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:14px 16px;
+    margin-bottom:14px;
+  }
+  .session-box label{
+    display:block;
+    font-size:0.72rem;
+    text-transform:uppercase;
+    color:#5C6E62;
+    margin-bottom:6px;
+    letter-spacing:0.03em;
+  }
+  .session-box input{
+    width:100%;
+    border:none;
+    border-bottom:2px solid var(--line);
+    font-size:1rem;
+    font-family:inherit;
+    padding:4px 2px;
+    background:transparent;
+    color:var(--ink);
+  }
+  .session-box input:focus{outline:none;border-bottom-color:var(--teal);}
+
+  .scan-btn{
+    width:100%;
+    background:var(--amber);
+    color:var(--teal);
+    border:none;
+    border-radius:8px;
+    padding:20px;
+    font-size:1.15rem;
+    font-weight:700;
+    font-family:inherit;
+    cursor:pointer;
+    box-shadow:0 2px 0 var(--amber-dim);
+    margin-bottom:16px;
+  }
+  .scan-btn:active{transform:translateY(2px); box-shadow:none;}
+  .scan-btn.stop{background:var(--red); color:var(--white); box-shadow:0 2px 0 #8A3529;}
+
+  #reader{
+    width:100%;
+    border-radius:8px;
+    overflow:hidden;
+    margin-bottom:16px;
+    border:1px solid var(--line);
+  }
+  #reader.hidden{display:none;}
+
+  .toast{
+    padding:12px 14px;
+    border-radius:6px;
+    font-size:0.9rem;
+    margin-bottom:14px;
+    font-weight:500;
+    display:none;
+  }
+  .toast.show{display:block;}
+  .toast.ok{background:#DCEFE1; color:#1E4A3D; border:1px solid #A9CFB6;}
+  .toast.dupe{background:#FBEBD6; color:#8A5A1B; border:1px solid #E9C48C;}
+  .toast.err{background:#F6DEDA; color:#8A2E20; border:1px solid #E3A79B;}
+
+  .roster-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:8px;
+  }
+  .roster-head h2{
+    font-size:0.95rem;
+    margin:0;
+    font-weight:600;
+  }
+  .roster-head span{
+    font-size:0.8rem;
+    color:#5C6E62;
+  }
+
+  .roster{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:6px;
+    overflow:hidden;
+    margin-bottom:20px;
+  }
+  .roster .row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 14px;
+    border-bottom:1px solid var(--paper-2);
+  }
+  .roster .row:last-child{border-bottom:none;}
+  .roster .idx{
+    font-size:0.75rem;
+    color:#8A9A8E;
+    width:20px;
+    flex-shrink:0;
+  }
+  .roster .sid{
+    flex:1;
+    font-size:0.95rem;
+    font-weight:500;
+  }
+  .roster .time{
+    font-size:0.78rem;
+    color:#5C6E62;
+    flex-shrink:0;
+  }
+  .roster .flag{
+    font-size:0.7rem;
+    padding:2px 6px;
+    border-radius:3px;
+    flex-shrink:0;
+  }
+  .flag.pending{background:#FBEBD6; color:#8A5A1B;}
+  .flag.synced{background:#DCEFE1; color:#1E4A3D;}
+
+  .empty{
+    padding:28px 14px;
+    text-align:center;
+    color:#8A9A8E;
+    font-size:0.9rem;
+  }
+
+  .sync-bar{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  .sync-btn{
+    flex:1;
+    background:var(--teal);
+    color:var(--paper);
+    border:none;
+    border-radius:6px;
+    padding:13px;
+    font-size:0.95rem;
+    font-weight:600;
+    font-family:inherit;
+    cursor:pointer;
+  }
+  .sync-btn:disabled{opacity:0.5;}
+  .pending-count{
+    font-size:0.8rem;
+    color:#5C6E62;
+    white-space:nowrap;
+  }
+
+  footer{
+    text-align:center;
+    padding:20px;
+    font-size:0.72rem;
+    color:#8A9A8E;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Roll Call</h1>
+  <div class="sub">Offline attendance scanner</div>
+  <div class="status-row">
+    <div class="dot" id="netDot"></div>
+    <span id="netLabel">Checking connection…</span>
+  </div>
+</header>
+
+<main>
+
+  <div class="session-box">
+    <label for="sessionName">Class / session</label>
+    <input type="text" id="sessionName" placeholder="e.g. Grade 6 — Morning" />
+  </div>
+  <div class="session-box">
+    <label for="deviceName">Your name (this device)</label>
+    <input type="text" id="deviceName" placeholder="e.g. Mr. Ahmed" />
+  </div>
+
+  <button class="scan-btn" id="scanToggle">Start scanning</button>
+  <div id="reader" class="hidden"></div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="roster-head">
+    <h2>Today's scans</h2>
+    <span id="todayDate"></span>
+  </div>
+  <div class="roster" id="roster">
+    <div class="empty">No students scanned yet today.</div>
+  </div>
+
+  <div class="sync-bar">
+    <button class="sync-btn" id="syncBtn">Sync now</button>
+    <span class="pending-count" id="pendingCount"></span>
+  </div>
+
+</main>
+
+<footer>Works fully offline · syncs automatically when back online</footer>
+
+<script type="module">
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAv3_nHPPo_NO9_snNDkwpbC47hXL8F8iY",
+  authDomain: "sunday-schools-e3fb8.firebaseapp.com",
+  projectId: "sunday-schools-e3fb8",
+  storageBucket: "sunday-schools-e3fb8.firebasestorage.app",
+  messagingSenderId: "1048115882730",
+  appId: "1:1048115882730:web:84a6b220b05c0c89bf8593",
+  measurementId: "G-738CGLVDQP"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+// ============================================================
+// 2. LOCAL DB (IndexedDB) — this is what makes scanning work
+//    with zero connectivity. Every scan is written here first.
+// ============================================================
+const DB_NAME = "roll-call-db";
+const STORE = "scans";
+
+function openDb(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const idb = req.result;
+      if (!idb.objectStoreNames.contains(STORE)){
+        idb.createObjectStore(STORE, { keyPath: "id" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGetAll(){
+  const idb = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGet(id){
+  const idb = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbPut(record){
+  const idb = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).put(record);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ============================================================
+// 3. HELPERS
+// ============================================================
+function todayStr(){
+  const d = new Date();
+  return d.toISOString().slice(0,10); // YYYY-MM-DD
+}
+
+function fmtTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+}
+
+function showToast(msg, kind){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + kind;
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { t.className = 'toast'; }, 2600);
+}
+
+document.getElementById('todayDate').textContent = new Date().toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' });
+
+// persist session/device name in localStorage (fine — this is a real
+// hosted app, not a Claude artifact, so normal browser storage applies)
+const sessionInput = document.getElementById('sessionName');
+const deviceInput = document.getElementById('deviceName');
+sessionInput.value = localStorage.getItem('rc_session') || '';
+deviceInput.value = localStorage.getItem('rc_device') || '';
+sessionInput.addEventListener('input', () => localStorage.setItem('rc_session', sessionInput.value));
+deviceInput.addEventListener('input', () => localStorage.setItem('rc_device', deviceInput.value));
+
+// ============================================================
+// 4. RECORD A SCAN (called every time the camera reads a QR code)
+// ============================================================
+async function recordScan(studentId){
+  studentId = studentId.trim();
+  if (!studentId) return;
+
+  const date = todayStr();
+  const id = `${date}_${studentId}`;
+
+  const existing = await idbGet(id);
+  if (existing){
+    showToast(`Already marked present: ${studentId}`, 'dupe');
+    return;
+  }
+
+  const record = {
+    id,
+    studentId,
+    date,
+    timestamp: new Date().toISOString(),
+    session: sessionInput.value || null,
+    device: deviceInput.value || null,
+    synced: false
+  };
+  await idbPut(record);
+  showToast(`Marked present: ${studentId}`, 'ok');
+  await renderRoster();
+  maybeSync(); // try immediately in case we're online
+}
+
+// ============================================================
+// 5. RENDER TODAY'S LIST
+// ============================================================
+async function renderRoster(){
+  const all = await idbGetAll();
+  const today = todayStr();
+  const todays = all.filter(r => r.date === today).sort((a,b) => a.timestamp.localeCompare(b.timestamp));
+
+  const rosterEl = document.getElementById('roster');
+  if (todays.length === 0){
+    rosterEl.innerHTML = '<div class="empty">No students scanned yet today.</div>';
+  } else {
+    rosterEl.innerHTML = todays.map((r, i) => `
+      <div class="row">
+        <span class="idx">${i+1}</span>
+        <span class="sid mono">${escapeHtml(r.studentId)}</span>
+        <span class="time mono">${fmtTime(r.timestamp)}</span>
+        <span class="flag ${r.synced ? 'synced' : 'pending'}">${r.synced ? 'synced' : 'pending'}</span>
+      </div>
+    `).join('');
+  }
+
+  const pending = all.filter(r => !r.synced).length;
+  document.getElementById('pendingCount').textContent = pending > 0 ? `${pending} pending sync` : 'all synced';
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============================================================
+// 6. SYNC TO FIRESTORE
+//    Uses a transaction so the FIRST scan to reach the server
+//    (from any device) wins. Later duplicates are simply
+//    marked synced without overwriting the original.
+// ============================================================
+let syncing = false;
+
+async function syncNow(){
+  if (syncing) return;
+  if (!navigator.onLine){
+    showToast('No connection — will sync automatically once online', 'err');
+    return;
+  }
+  syncing = true;
+  document.getElementById('syncBtn').disabled = true;
+
+  try {
+    const all = await idbGetAll();
+    const unsynced = all.filter(r => !r.synced);
+    let ok = 0, fail = 0;
+
+    for (const r of unsynced){
+      try {
+        const ref = doc(db, "attendance", r.id);
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()){
+            tx.set(ref, {
+              studentId: r.studentId,
+              date: r.date,
+              timestamp: r.timestamp,
+              session: r.session,
+              device: r.device,
+              syncedAt: serverTimestamp()
+            });
+          }
+          // if it already exists, we do nothing — first scan wins,
+          // but we still mark our local copy as synced below.
+        });
+        r.synced = true;
+        await idbPut(r);
+        ok++;
+      } catch (e){
+        console.error('Sync failed for', r.id, e);
+        fail++;
+      }
+    }
+
+    if (ok > 0) showToast(`Synced ${ok} record${ok>1?'s':''}`, 'ok');
+    if (fail > 0) showToast(`${fail} failed to sync — will retry`, 'err');
+    if (unsynced.length === 0) showToast('Everything already synced', 'ok');
+
+  } finally {
+    syncing = false;
+    document.getElementById('syncBtn').disabled = false;
+    await renderRoster();
+  }
+}
+
+function maybeSync(){
+  if (navigator.onLine) syncNow();
+}
+
+document.getElementById('syncBtn').addEventListener('click', syncNow);
+window.addEventListener('online', () => { updateNetStatus(); maybeSync(); });
+window.addEventListener('offline', updateNetStatus);
+
+function updateNetStatus(){
+  const dot = document.getElementById('netDot');
+  const label = document.getElementById('netLabel');
+  if (navigator.onLine){
+    dot.classList.add('on');
+    label.textContent = 'Online — syncing available';
+  } else {
+    dot.classList.remove('on');
+    label.textContent = 'Offline — scans are being saved on this device';
+  }
+}
+
+// ============================================================
+// 7. CAMERA SCANNER (html5-qrcode)
+// ============================================================
+let html5QrCode = null;
+let scanning = false;
+
+async function startScanning(){
+  const readerEl = document.getElementById('reader');
+  readerEl.classList.remove('hidden');
+  html5QrCode = new Html5Qrcode("reader");
+  try {
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 240, height: 240 } },
+      (decodedText) => {
+        recordScan(decodedText);
+        // brief pause to avoid double-firing on the same code
+        html5QrCode.pause(true);
+        setTimeout(() => { if (scanning) html5QrCode.resume(); }, 1200);
+      },
+      () => {} // ignore per-frame decode errors
+    );
+    scanning = true;
+    const btn = document.getElementById('scanToggle');
+    btn.textContent = 'Stop scanning';
+    btn.classList.add('stop');
+  } catch (e){
+    console.error(e);
+    showToast('Could not access camera', 'err');
+    readerEl.classList.add('hidden');
+  }
+}
+
+async function stopScanning(){
+  if (html5QrCode){
+    try { await html5QrCode.stop(); html5QrCode.clear(); } catch(e){}
+  }
+  scanning = false;
+  document.getElementById('reader').classList.add('hidden');
+  const btn = document.getElementById('scanToggle');
+  btn.textContent = 'Start scanning';
+  btn.classList.remove('stop');
+}
+
+document.getElementById('scanToggle').addEventListener('click', () => {
+  scanning ? stopScanning() : startScanning();
+});
+
+// ============================================================
+// 8. INIT
+// ============================================================
+updateNetStatus();
+renderRoster();
+maybeSync();
+
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(console.error);
+  });
+}
+</script>
+
+</body>
+</html>
